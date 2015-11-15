@@ -1,0 +1,30 @@
+-- VERSION_4
+-- START DISKCACHE_2
+C:\Users\saurabh\workspace\.metadata\.plugins\org.eclipse.core.resources\.projects\three_node\com.python.pydev.analysis\v2_indexcache
+src.__init__|1447482276638097000|C:\Users\saurabh\workspace\three_node\src\__init__.py
+src.controller_node|1447503588956092000|C:\Users\saurabh\workspace\three_node\src\controller_node.py
+-- END DISKCACHE
+-- START DICTIONARY
+1
+1=src.controller_node
+-- END DICTIONARY
+-- START TREE 1
+14
+_cr|1|_create_keystone_users!10@
+add|1|add_to_conf!10@
+con|1|controller!11@
+del|2|delete_file!10@delete_from_conf!10@
+exe|2|execute_db_commnads!10@execute!10@
+get|1|get_from_conf!10@
+ini|2|initialize_system!10@iniparse!11@
+ins|7|install_rabbitmq!10@install_database!10@install_and_configure_keystone!10@install_and_configure_dashboard!10@install_and_configure_glance!10@install_and_configure_nova!10@install_and_configure_neutron!10@
+kil|1|kill_process!10@
+mys|1|mysql_password!11@
+pri|1|print_format!10@
+psu|1|psutil!11@
+ser|1|service_tenant!11@
+wri|1|write_to_file!10@
+-- END TREE
+-- START TREE 2
+0
+-- END TREE
