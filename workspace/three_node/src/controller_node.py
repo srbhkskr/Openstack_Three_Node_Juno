@@ -116,11 +116,11 @@ def initialize_system():
 
     execute("apt-get clean" , True)
     execute("apt-get autoclean -y" , True)
-    execute("apt-get update -y" , True)
-    execute("apt-get install ubuntu-cloud-keyring python-setuptools python-iniparse python-psutil -y", True)
+    execute("apt-get -f update -y" , True)
+    execute("apt-get -f install ubuntu-cloud-keyring python-setuptools python-iniparse python-psutil -y", True)
     delete_file("/etc/apt/sources.list.d/juno.list")
     execute("echo deb http://ubuntu-cloud.archive.canonical.com/ubuntu trusty-updates/juno main >> /etc/apt/sources.list.d/juno.list")
-    execute("apt-get update -y && apt-get upgrade -y", True)
+    execute("apt-get -f update -y && apt-get -f upgrade -y", True)
 
     global iniparse
     if iniparse is None:
@@ -135,7 +135,7 @@ def initialize_system():
 
 
 def install_rabbitmq():
-    execute("apt-get install rabbitmq-server -y", True)
+    execute("apt-get -f install rabbitmq-server -y", True)
     execute("service rabbitmq-server restart", True)
     execute("rabbitmqctl change_password guest openstack", True)
     time.sleep(2)
@@ -143,7 +143,7 @@ def install_rabbitmq():
 
 def install_database():
     
-    execute("apt-get install mariadb-server python-mysqldb -y", True)
+    execute("apt-get -f install mariadb-server python-mysqldb -y", True)
     add_to_conf("/etc/mysql/my.cnf", "mysqld", "bind-address" , "10.10.10.10")
     add_to_conf("/etc/mysql/my.cnf", "mysqld", "default-storage-engine" , "innodb")
     add_to_conf("/etc/mysql/my.cnf", "mysqld", "collation-server" , "utf8_general_ci")
@@ -262,7 +262,7 @@ def install_and_configure_glance():
     execute_db_commnads("GRANT ALL PRIVILEGES ON glance.* TO 'glance'@'%' IDENTIFIED BY 'glance';")
     execute_db_commnads("GRANT ALL PRIVILEGES ON glance.* TO 'glance'@'controller' IDENTIFIED BY 'glance';")
 
-    execute("apt-get install glance -y", True)
+    execute("apt-get -f install glance -y", True)
 
 
     
@@ -318,7 +318,7 @@ def install_and_configure_nova():
     execute_db_commnads("GRANT ALL PRIVILEGES ON nova.* TO 'nova'@'%' IDENTIFIED BY 'nova';")
     execute_db_commnads("GRANT ALL PRIVILEGES ON nova.* TO 'nova'@'controller' IDENTIFIED BY 'nova';")
 
-    execute("apt-get install nova-api nova-cert nova-conductor nova-consoleauth  nova-novncproxy nova-scheduler python-novaclient-y", True)
+    execute("apt-get -f install nova-api nova-cert nova-conductor nova-consoleauth  nova-novncproxy nova-scheduler python-novaclient-y", True)
 
 
     add_to_conf(nova_conf, "database", "connection", "mysql://nova:nova@controller/nova")
@@ -377,8 +377,8 @@ def install_and_configure_neutron():
     execute_db_commnads("GRANT ALL PRIVILEGES ON neutron.* TO 'neutron'@'%' IDENTIFIED BY 'neutron';")
     execute_db_commnads("GRANT ALL PRIVILEGES ON neutron.* TO 'neutron'@'controller' IDENTIFIED BY 'neutron';")
 
-    execute("apt-get install neutron-server -y", True)
-    execute("apt-get install neutron-plugin-ml2 python-neutronclient -y",True)
+    execute("apt-get -f install neutron-server -y", True)
+    execute("apt-get -f install neutron-plugin-ml2 python-neutronclient -y",True)
     
     add_to_conf(neutron_conf, "database", "connection", "mysql://neutron:neutron@controller/neutron")
     add_to_conf(neutron_conf, "DEFAULT", "verbose", "True")
@@ -429,7 +429,7 @@ def install_and_configure_neutron():
 
 
 def install_and_configure_dashboard():
-    execute("apt-get install openstack-dashboard apache2 libapache2-mod-wsgi memcached python-memcache -y", True)
+    execute("apt-get -f install openstack-dashboard apache2 libapache2-mod-wsgi memcached python-memcache -y", True)
     execute("service apache2 restart", True)
 
 initialize_system()
