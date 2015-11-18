@@ -117,10 +117,10 @@ def initialize_system():
     execute("apt-get clean" , True)
     execute("apt-get autoclean -y" , True)
     execute("apt-get update -y" , True)
-    execute("apt-get install ubuntu-cloud-keyring python-setuptools python-iniparse python-psutil -y", True)
+    execute("apt-get install -f ubuntu-cloud-keyring python-setuptools python-iniparse python-psutil -y", True)
     delete_file("/etc/apt/sources.list.d/juno.list")
     execute("echo deb http://ubuntu-cloud.archive.canonical.com/ubuntu trusty-updates/juno main >> /etc/apt/sources.list.d/juno.list")
-    execute("apt-get update -y && apt-get upgrade -y", True)
+    execute("apt-get update -y && apt-get -f upgrade -y", True)
 
     global iniparse
     if iniparse is None:
@@ -135,20 +135,23 @@ def initialize_system():
 
 
 def install_rabbitmq():
-    execute("apt-get install rabbitmq-server -y", True)
+    execute("apt-get install -f rabbitmq-server -y", True)
     execute("service rabbitmq-server restart", True)
     execute("rabbitmqctl change_password guest openstack", True)
     time.sleep(2)
 
 
 def install_database():
+
+    os.environ['DEBIAN_FRONTEND'] = 'noninteractive'
     
     execute("apt-get install mariadb-server python-mysqldb -y", True)
-    add_to_conf("/etc/mysql/my.cnf", "mysqld", "bind-address" , "10.10.10.10")
+
     add_to_conf("/etc/mysql/my.cnf", "mysqld", "default-storage-engine" , "innodb")
     add_to_conf("/etc/mysql/my.cnf", "mysqld", "collation-server" , "utf8_general_ci")
     add_to_conf("/etc/mysql/my.cnf", "mysqld", "init-connect" , "'SET NAMES utf8'")
     add_to_conf("/etc/mysql/my.cnf", "mysqld", "character-set-server" , "utf8")
+    add_to_conf("/etc/mysql/my.cnf", "mysqld", "bind-address" , "10.10.10.10")
     
     execute("service mysql restart", True)
     time.sleep(2)
@@ -187,6 +190,23 @@ def _create_keystone_users():
     execute( "keystone endpoint-create --service-id %s --publicurl http://controller:5000/v2.0 --internalurl http://controller:5000/v2.0 --adminurl http://controller:35357/v2.0 --region regionOne" % keystone_service)
 
 
+    #write a rc file
+    adminrc = "/root/admin_rc.sh"
+    delete_file(adminrc)
+    write_to_file(adminrc, "export OS_USERNAME=admin\n")
+    write_to_file(adminrc, "export OS_PASSWORD=openstck\n")
+    write_to_file(adminrc, "export OS_TENANT_NAME=admin\n")
+    write_to_file(adminrc, "export OS_AUTH_URL=http://controller:5000/v2.0\n")
+
+    demorc = "/root/demo_rc.sh"
+    delete_file(demorc)
+    write_to_file(demorc, "export OS_USERNAME=demo\n")
+    write_to_file(demorc, "export OS_PASSWORD=openstck\n")
+    write_to_file(demorc, "export OS_TENANT_NAME=demo\n")
+    write_to_file(demorc, "export OS_AUTH_URL=http://controller:5000/v2.0\n")
+
+    execute("source /root/admin_rc.sh")
+
     #Glance
     glance_user = execute("keystone user-create --tenant_id %s --name glance --pass glance --enabled true|grep ' id '|awk '{print $4}'" % service_tenant)
     execute("keystone user-role-add --user_id %s --tenant_id %s --role_id %s" % (glance_user, service_tenant, admin_role))
@@ -200,7 +220,7 @@ def _create_keystone_users():
     execute("keystone user-role-add --user_id %s --tenant_id %s --role_id %s" % (nova_user, service_tenant, admin_role))
 
     nova_service = execute("keystone service-create --name=nova --type=compute --description='Nova Compute Service'|grep ' id '|awk '{print $4}'")
-    execute("keystone endpoint-create --service-id %s --publicurl http://controller:8774/v2/%\(tenant_id\)s --internalurl http://controller:8774/v2/%\(tenant_id\)s --adminurl http://controller:8774/v2/%\(tenant_id\)s --region regionOne"%nova_service)
+    execute("keystone endpoint-create --service-id %s --publicurl http://controller:8774/v2/\$\(tenant_id\)s --internalurl http://controller:8774/v2/\$\(tenant_id\)s --adminurl http://controller:8774/v2/\$\(tenant_id\)s --region regionOne"%nova_service)
 
 
     #neutron
@@ -210,20 +230,7 @@ def _create_keystone_users():
     neutron_service = execute("keystone service-create --name=neutron --type=network  --description='OpenStack Networking service'|grep ' id '|awk '{print $4}'")
     execute("keystone endpoint-create --service-id %s --publicurl http://controller:9696 --internalurl http://controller:9696 --adminurl http://controller:9696 --region regionOne"%neutron_service)
 
-    #write a rc file
-    adminrc = "/root/adminrc"
-    delete_file(adminrc)
-    write_to_file(adminrc, "export OS_USERNAME=admin\n")
-    write_to_file(adminrc, "export OS_PASSWORD=openstck\n")
-    write_to_file(adminrc, "export OS_TENANT_NAME=admin\n")
-    write_to_file(adminrc, "export OS_AUTH_URL=http://controller:5000/v2.0\n")
-    
-    demorc = "/root/demorc"
-    delete_file(demorc)
-    write_to_file(demorc, "export OS_USERNAME=demo\n")
-    write_to_file(demorc, "export OS_PASSWORD=openstck\n")
-    write_to_file(demorc, "export OS_TENANT_NAME=demo\n")
-    write_to_file(demorc, "export OS_AUTH_URL=http://controller:5000/v2.0\n")
+
 
 
 
@@ -235,7 +242,7 @@ def install_and_configure_keystone():
     execute_db_commnads("GRANT ALL PRIVILEGES ON keystone.* TO 'keystone'@'%' IDENTIFIED BY 'keystone';")
     execute_db_commnads("GRANT ALL PRIVILEGES ON keystone.* TO 'keystone'@'controller' IDENTIFIED BY 'keystone';")
 
-    execute("apt-get install keystone -y", True)
+    execute("apt-get -f install keystone -y", True)
 
 
     add_to_conf(keystone_conf, "DEFAULT", "admin_token", "ADMINTOKEN")
@@ -262,7 +269,7 @@ def install_and_configure_glance():
     execute_db_commnads("GRANT ALL PRIVILEGES ON glance.* TO 'glance'@'%' IDENTIFIED BY 'glance';")
     execute_db_commnads("GRANT ALL PRIVILEGES ON glance.* TO 'glance'@'controller' IDENTIFIED BY 'glance';")
 
-    execute("apt-get install glance -y", True)
+    execute("apt-get -f install glance -y", True)
 
 
     
@@ -318,7 +325,7 @@ def install_and_configure_nova():
     execute_db_commnads("GRANT ALL PRIVILEGES ON nova.* TO 'nova'@'%' IDENTIFIED BY 'nova';")
     execute_db_commnads("GRANT ALL PRIVILEGES ON nova.* TO 'nova'@'controller' IDENTIFIED BY 'nova';")
 
-    execute("apt-get install nova-api nova-cert nova-conductor nova-consoleauth  nova-novncproxy nova-scheduler python-novaclient-y", True)
+    execute("apt-get install nova-api nova-cert nova-conductor nova-consoleauth  nova-novncproxy nova-scheduler python-novaclient -y", True)
 
 
     add_to_conf(nova_conf, "database", "connection", "mysql://nova:nova@controller/nova")
