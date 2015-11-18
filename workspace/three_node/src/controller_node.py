@@ -147,6 +147,8 @@ def install_database():
     
     execute("apt-get install mariadb-server python-mysqldb -y", True)
 
+    #Please Comment all without = lines before you do add to conf otherwise it will couse parse error
+
     add_to_conf("/etc/mysql/my.cnf", "mysqld", "default-storage-engine" , "innodb")
     add_to_conf("/etc/mysql/my.cnf", "mysqld", "collation-server" , "utf8_general_ci")
     add_to_conf("/etc/mysql/my.cnf", "mysqld", "init-connect" , "'SET NAMES utf8'")
@@ -194,14 +196,14 @@ def _create_keystone_users():
     adminrc = "/root/admin_rc.sh"
     delete_file(adminrc)
     write_to_file(adminrc, "export OS_USERNAME=admin\n")
-    write_to_file(adminrc, "export OS_PASSWORD=openstck\n")
+    write_to_file(adminrc, "export OS_PASSWORD=openstack\n")
     write_to_file(adminrc, "export OS_TENANT_NAME=admin\n")
     write_to_file(adminrc, "export OS_AUTH_URL=http://controller:5000/v2.0\n")
 
     demorc = "/root/demo_rc.sh"
     delete_file(demorc)
     write_to_file(demorc, "export OS_USERNAME=demo\n")
-    write_to_file(demorc, "export OS_PASSWORD=openstck\n")
+    write_to_file(demorc, "export OS_PASSWORD=openstack\n")
     write_to_file(demorc, "export OS_TENANT_NAME=demo\n")
     write_to_file(demorc, "export OS_AUTH_URL=http://controller:5000/v2.0\n")
 
