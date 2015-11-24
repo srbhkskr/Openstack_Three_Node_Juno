@@ -14,6 +14,7 @@ import subprocess
 iniparse = None
 psutil = None
 
+
 mysql_password = "openstack"
 service_tenant = None
 controller = "10.10.10.10"
@@ -119,7 +120,7 @@ def initialize_system():
     execute("apt-get update -y" , True)
     execute("apt-get install -f ubuntu-cloud-keyring python-setuptools python-iniparse python-psutil -y", True)
     delete_file("/etc/apt/sources.list.d/juno.list")
-    execute("echo deb http://ubuntu-cloud.archive.canonical.com/ubuntu trusty-updates/juno main >> /etc/apt/sources.list.d/juno.list")
+    execute('echo "deb http://ubuntu-cloud.archive.canonical.com/ubuntu" "trusty-updates/juno main" > /etc/apt/sources.list.d/cloudarchive-juno.list')
     execute("apt-get update -y && apt-get -f upgrade -y", True)
 
     global iniparse
@@ -210,7 +211,7 @@ def _create_keystone_users():
     execute("source /root/admin_rc.sh")
 
     #Glance
-    glance_user = execute("keystone user-create --tenant_id %s --name glance --pass glance --enabled true|grep ' id '|awk '{print $4}'" % service_tenant)
+    glance_user = execute("keystone user-create --tenant_id %s --name glance --pass openstack --enabled true|grep ' id '|awk '{print $4}'" % service_tenant)
     execute("keystone user-role-add --user_id %s --tenant_id %s --role_id %s" % (glance_user, service_tenant, admin_role))
 
     glance_service = execute("keystone service-create --name=glance --type=image --description='Glance Image Service'|grep ' id '|awk '{print $4}'")
@@ -218,7 +219,7 @@ def _create_keystone_users():
 
 
     #nova
-    nova_user = execute("keystone user-create --tenant_id %s --name nova --pass nova --enabled true|grep ' id '|awk '{print $4}'" % service_tenant)
+    nova_user = execute("keystone user-create --tenant_id %s --name nova --pass openstack --enabled true|grep ' id '|awk '{print $4}'" % service_tenant)
     execute("keystone user-role-add --user_id %s --tenant_id %s --role_id %s" % (nova_user, service_tenant, admin_role))
 
     nova_service = execute("keystone service-create --name=nova --type=compute --description='Nova Compute Service'|grep ' id '|awk '{print $4}'")
@@ -226,7 +227,7 @@ def _create_keystone_users():
 
 
     #neutron
-    neutron_user = execute("keystone user-create --tenant_id %s --name neutron --pass neutron --enabled true|grep ' id '|awk '{print $4}'" % service_tenant)
+    neutron_user = execute("keystone user-create --tenant_id %s --name neutron --pass openstack --enabled true|grep ' id '|awk '{print $4}'" % service_tenant)
     execute("keystone user-role-add --user_id %s --tenant_id %s --role_id %s" % (neutron_user, service_tenant, admin_role))
 
     neutron_service = execute("keystone service-create --name=neutron --type=network  --description='OpenStack Networking service'|grep ' id '|awk '{print $4}'")
@@ -241,16 +242,19 @@ def install_and_configure_keystone():
 
     execute_db_commnads("DROP DATABASE IF EXISTS keystone;")
     execute_db_commnads("CREATE DATABASE keystone;")
-    execute_db_commnads("GRANT ALL PRIVILEGES ON keystone.* TO 'keystone'@'%' IDENTIFIED BY 'keystone';")
-    execute_db_commnads("GRANT ALL PRIVILEGES ON keystone.* TO 'keystone'@'controller' IDENTIFIED BY 'keystone';")
+    execute_db_commnads("GRANT ALL PRIVILEGES ON keystone.* TO 'keystone'@'%' IDENTIFIED BY 'openstack';")
+    execute_db_commnads("GRANT ALL PRIVILEGES ON keystone.* TO 'keystone'@'controller' IDENTIFIED BY 'openstack';")
 
     execute("apt-get -f install keystone -y", True)
 
 
     add_to_conf(keystone_conf, "DEFAULT", "admin_token", "ADMINTOKEN")
     add_to_conf(keystone_conf, "DEFAULT", "admin_port", 35357)
-    add_to_conf(keystone_conf, "database", "connection", "mysql://keystone:keystone@controller/keystone")
-    add_to_conf(keystone_conf, "signing", "token_format", "UUID")
+    add_to_conf(keystone_conf, "database", "connection", "mysql://keystone:openstack@controller/keystone")
+    add_to_conf(keystone_conf, "revoke", "token_format", "keystone.contrib.revoke.backends.sql.Revoke")
+    add_to_conf(keystone_conf, "token", "provider", "keystone.token.providers.uuid.Provider")
+    add_to_conf(keystone_conf, "token", "driver", "keystone.token.persistence.backends.sql.Token")
+
 
     execute("keystone-manage db_sync")
 
@@ -268,15 +272,15 @@ def install_and_configure_glance():
 
     execute_db_commnads("DROP DATABASE IF EXISTS glance;")
     execute_db_commnads("CREATE DATABASE glance;")
-    execute_db_commnads("GRANT ALL PRIVILEGES ON glance.* TO 'glance'@'%' IDENTIFIED BY 'glance';")
-    execute_db_commnads("GRANT ALL PRIVILEGES ON glance.* TO 'glance'@'controller' IDENTIFIED BY 'glance';")
+    execute_db_commnads("GRANT ALL PRIVILEGES ON glance.* TO 'glance'@'%' IDENTIFIED BY 'openstack';")
+    execute_db_commnads("GRANT ALL PRIVILEGES ON glance.* TO 'glance'@'controller' IDENTIFIED BY 'openstack';")
 
     execute("apt-get -f install glance -y", True)
 
 
     
 
-    add_to_conf(glance_api_conf, "DEFAULT", "sql_connection", "mysql://glance:glance@controller/glance")
+    add_to_conf(glance_api_conf, "DEFAULT", "sql_connection", "mysql://glance:openstack@controller/glance")
     add_to_conf(glance_api_conf, "paste_deploy", "flavor", "keystone")
     add_to_conf(glance_api_conf, "DEFAULT", "verbose", "true")
     add_to_conf(glance_api_conf, "DEFAULT", "debug", "true")
@@ -285,7 +289,7 @@ def install_and_configure_glance():
     add_to_conf(glance_api_conf, "keystone_authtoken", "identity_uri", "http://controller:35357")
     add_to_conf(glance_api_conf, "keystone_authtoken", "admin_tenant_name", "service")
     add_to_conf(glance_api_conf, "keystone_authtoken", "admin_user", "glance")
-    add_to_conf(glance_api_conf, "keystone_authtoken", "admin_password", "glance")
+    add_to_conf(glance_api_conf, "keystone_authtoken", "admin_password", "openstack")
     add_to_conf(glance_api_conf, "glance_store", "default_store", "file")
     add_to_conf(glance_api_conf, "glance_store", "filesystem_store_datadir", "/var/lib/glance/images/")
     delete_from_conf(glance_api_conf, "keystone_authtoken", "auth_host")
@@ -293,7 +297,7 @@ def install_and_configure_glance():
     delete_from_conf(glance_api_conf, "keystone_authtoken", "auth_protocol")
     #add_to_conf(glance_api_conf, "DEFAULT", "db_enforce_mysql_charset", "false")
 
-    add_to_conf(glance_registry_conf, "DEFAULT", "sql_connection", "mysql://glance:glance@controller/glance")
+    add_to_conf(glance_registry_conf, "DEFAULT", "sql_connection", "mysql://glance:openstack@controller/glance")
     add_to_conf(glance_registry_conf, "paste_deploy", "flavor", "keystone")
     add_to_conf(glance_registry_conf, "DEFAULT", "verbose", "true")
     add_to_conf(glance_registry_conf, "DEFAULT", "debug", "true")
@@ -302,7 +306,7 @@ def install_and_configure_glance():
     add_to_conf(glance_registry_conf, "keystone_authtoken", "identity_uri", "http://controller:35357")
     add_to_conf(glance_registry_conf, "keystone_authtoken", "admin_tenant_name", "service")
     add_to_conf(glance_registry_conf, "keystone_authtoken", "admin_user", "glance")
-    add_to_conf(glance_registry_conf, "keystone_authtoken", "admin_password", "glance")
+    add_to_conf(glance_registry_conf, "keystone_authtoken", "admin_password", "openstack")
     add_to_conf(glance_registry_conf, "glance_store", "default_store", "file")
     add_to_conf(glance_registry_conf, "glance_store", "filesystem_store_datadir", "/var/lib/glance/images/")
     delete_from_conf(glance_registry_conf, "keystone_authtoken", "auth_host")
@@ -324,13 +328,13 @@ def install_and_configure_nova():
     
     execute_db_commnads("DROP DATABASE IF EXISTS nova;")
     execute_db_commnads("CREATE DATABASE nova;")
-    execute_db_commnads("GRANT ALL PRIVILEGES ON nova.* TO 'nova'@'%' IDENTIFIED BY 'nova';")
-    execute_db_commnads("GRANT ALL PRIVILEGES ON nova.* TO 'nova'@'controller' IDENTIFIED BY 'nova';")
+    execute_db_commnads("GRANT ALL PRIVILEGES ON nova.* TO 'nova'@'%' IDENTIFIED BY 'openstack';")
+    execute_db_commnads("GRANT ALL PRIVILEGES ON nova.* TO 'nova'@'controller' IDENTIFIED BY 'openstack';")
 
     execute("apt-get install nova-api nova-cert nova-conductor nova-consoleauth  nova-novncproxy nova-scheduler python-novaclient -y", True)
 
 
-    add_to_conf(nova_conf, "database", "connection", "mysql://nova:nova@controller/nova")
+    add_to_conf(nova_conf, "database", "connection", "mysql://nova:openstack@controller/nova")
     add_to_conf(nova_conf, "DEFAULT", "rabbit_host", "controller" )
     add_to_conf(nova_conf, "DEFAULT", "rabbit_password", "openstack" )
     add_to_conf(nova_conf, "DEFAULT", "rpc_backend", "rabbit" )
@@ -338,7 +342,7 @@ def install_and_configure_nova():
     add_to_conf(nova_conf, "keystone_authtoken", "identity_uri", "http://controller:35357")
     add_to_conf(nova_conf, "keystone_authtoken", "admin_tenant_name", "service")
     add_to_conf(nova_conf, "keystone_authtoken", "admin_user", "nova")
-    add_to_conf(nova_conf, "keystone_authtoken", "admin_password", "nova")
+    add_to_conf(nova_conf, "keystone_authtoken", "admin_password", "openstack")
     delete_from_conf(nova_conf, "keystone_authtoken", "auth_host")
     delete_from_conf(nova_conf, "keystone_authtoken", "auth_port")
     delete_from_conf(nova_conf, "keystone_authtoken", "auth_protocol")
@@ -358,7 +362,7 @@ def install_and_configure_nova():
     add_to_conf(nova_conf, "DEFAULT", "firewall_driver", "nova.virt.firewall.NoopFirewallDriver")
     
     add_to_conf(nova_conf, "neutron", "admin_username", "neutron")
-    add_to_conf(nova_conf, "neutron", "admin_password", "neutron")
+    add_to_conf(nova_conf, "neutron", "admin_password", "openstack")
     add_to_conf(nova_conf, "neutron", "admin_tenant_name", "service")
     add_to_conf(nova_conf, "neutron", "admin_auth_url", "http://controller:5000/v2.0/")
     add_to_conf(nova_conf, "neutron", "url", "http://controller:9696/")
@@ -383,13 +387,14 @@ def install_and_configure_neutron():
 
     execute_db_commnads("DROP DATABASE IF EXISTS neutron;")
     execute_db_commnads("CREATE DATABASE neutron;")
-    execute_db_commnads("GRANT ALL PRIVILEGES ON neutron.* TO 'neutron'@'%' IDENTIFIED BY 'neutron';")
-    execute_db_commnads("GRANT ALL PRIVILEGES ON neutron.* TO 'neutron'@'controller' IDENTIFIED BY 'neutron';")
+    execute_db_commnads("GRANT ALL PRIVILEGES ON neutron.* TO 'neutron'@'%' IDENTIFIED BY 'openstack';")
+    execute_db_commnads("GRANT ALL PRIVILEGES ON neutron.* TO 'neutron'@'controller' IDENTIFIED BY 'openstack';")
 
     execute("apt-get install neutron-server -y", True)
     execute("apt-get install neutron-plugin-ml2 python-neutronclient -y",True)
     
-    add_to_conf(neutron_conf, "database", "connection", "mysql://neutron:neutron@controller/neutron")
+    #add_to_conf(neutron_conf, "database", "connection", "mysql://neutron:openstack@controller/neutron")
+    add_to_conf(neutron_conf, "database", "connection", "mysql://neutron:openstack@controller/neutron")
     add_to_conf(neutron_conf, "DEFAULT", "verbose", "True")
     add_to_conf(neutron_conf, "DEFAULT", "rabbit_host", "controller" )
     add_to_conf(neutron_conf, "DEFAULT", "rabbit_password", "openstack" )
@@ -398,7 +403,7 @@ def install_and_configure_neutron():
     add_to_conf(neutron_conf, "keystone_authtoken", "identity_uri", "http://controller:35357")
     add_to_conf(neutron_conf, "keystone_authtoken", "admin_tenant_name", "service")
     add_to_conf(neutron_conf, "keystone_authtoken", "admin_user", "neutron")
-    add_to_conf(neutron_conf, "keystone_authtoken", "admin_password", "neutron")
+    add_to_conf(neutron_conf, "keystone_authtoken", "admin_password", "openstack")
     delete_from_conf(neutron_conf, "keystone_authtoken", "auth_host")
     delete_from_conf(neutron_conf, "keystone_authtoken", "auth_port")
     delete_from_conf(neutron_conf, "keystone_authtoken", "auth_protocol")
@@ -415,7 +420,7 @@ def install_and_configure_neutron():
     add_to_conf(neutron_conf, "DEFAULT", "notify_nova_on_port_data_changes", "True")
     add_to_conf(neutron_conf, "DEFAULT", "nova_url", "http://controller:8774/v2")
     add_to_conf(neutron_conf, "DEFAULT", "nova_admin_username", "nova")
-    add_to_conf(neutron_conf, "DEFAULT", "nova_admin_password", "nova")
+    add_to_conf(neutron_conf, "DEFAULT", "nova_admin_password", "openstack")
     add_to_conf(neutron_conf, "DEFAULT", "nova_admin_tenant_id", service_tenant)
     add_to_conf(neutron_conf, "DEFAULT", "nova_admin_auth_url", "http://controller:5000/v2.0/")
 
